@@ -238,7 +238,8 @@ def show_multi_modality_result(img,
     else:
         raise NotImplementedError(f'unsupported box mode {box_mode}')
 
-    result_path = osp.join(out_dir, filename)
+    #result_path = osp.join(out_dir, filename)
+    result_path = out_dir
     mmcv.mkdir_or_exist(result_path)
 
     if show:
@@ -255,8 +256,8 @@ def show_multi_modality_result(img,
                 color=pred_bbox_color)
         mmcv.imshow(show_img, win_name='project_bbox3d_img', wait_time=0)
 
-    if img is not None:
-        mmcv.imwrite(img, osp.join(result_path, f'{filename}_img.png'))
+    #if img is not None:
+    #    mmcv.imwrite(img, osp.join(result_path, f'{filename}_img.png'))
 
     if gt_bboxes is not None:
         gt_img = draw_bbox(
@@ -264,6 +265,10 @@ def show_multi_modality_result(img,
         mmcv.imwrite(gt_img, osp.join(result_path, f'{filename}_gt.png'))
 
     if pred_bboxes is not None:
-        pred_img = draw_bbox(
-            pred_bboxes, img, proj_mat, img_metas, color=pred_bbox_color)
-        mmcv.imwrite(pred_img, osp.join(result_path, f'{filename}_pred.png'))
+        try:
+            pred_img = draw_bbox(
+                pred_bboxes, img, proj_mat, img_metas, color=pred_bbox_color)
+            mmcv.imwrite(pred_img, osp.join(result_path, f'{filename}_pred.png'))
+        except:
+            mmcv.imwrite(img, osp.join(result_path, f'{filename}_pred.png'))
+

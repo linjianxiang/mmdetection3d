@@ -190,7 +190,107 @@ def inference_multi_modality_detector(model, pcd, image, ann_file):
         result = model(return_loss=False, rescale=True, **data)
     return result, data
 
+class inference_mono_detector():
+    def __init__(self,model,ann_file):
+        """Inference image with the monocular 3D detector.
 
+        Args:
+    	model (nn.Module): The loaded detector.
+    	ann_file (str): Annotation files.
+
+        """
+        cfg = model.cfg
+        self.model = model
+        self.device = next(model.parameters()).device  # model device
+        # build the data pipeline
+        self.test_pipeline = deepcopy(cfg.data.test.pipeline)
+        self.test_pipeline = Compose(self.test_pipeline)
+        self.box_type_3d,self.box_mode_3d = get_box_type(cfg.data.test.box_type_3d)
+        # get data info containing calib
+        data_infos = mmcv.load(ann_file)
+        self.image_info = data_infos['images'][0]
+    def inference_mono_3d_detector(self, image):
+        """Inference image with the monocular 3D detector.
+
+        Args:
+    	image (str): Image files.
+
+
+        Returns:
+    	tuple: Predicted results and data from pipeline.
+        """
+        data = dict(
+            img_prefix=osp.dirname(image),
+            img_info=dict(filename=osp.basename(image)),
+            box_type_3d=self.box_type_3d,
+            box_mode_3d=self.box_mode_3d,
+            img_fields=[],
+            bbox3d_fields=[],
+            pts_mask_fields=[],
+            pts_seg_fields=[],
+            bbox_fields=[],
+            mask_fields=[],
+            seg_fields=[])
+
+        data['img_info'].update(dict(cam_intrinsic=self.image_info['cam_intrinsic']))
+        data = self.test_pipeline(data)
+
+        data = collate([data], samples_per_gpu=1)
+        if next(self.model.parameters()).is_cuda:
+            # scatter to specified GPU
+            data = scatter(data, [self.device.index])[0]
+        else:
+            # this is a workaround to avoid the bug of MMDataParallel
+            data['img_metas'] = data['img_metas'][0].data
+            data['img'] = data['img'][0].data
+
+        # forward the model
+        with torch.no_grad():
+            result = self.model(return_loss=False, rescale=True, **data)
+        return result, data
+
+    def show_det_result_meshlab(data,
+                                result,
+                                out_dir,
+                                score_thr=0.0,
+                                show=False,
+                                snapshot=False):
+        """Show 3D detection result by meshlab."""
+        points = data['points'][0][0].cpu().numpy()
+        pts_filename = data['img_metas'][0][0]['pts_filename']
+        file_name = osp.split(pts_filename)[-1].split('.')[0]
+
+        if 'pts_bbox' in result[0].keys():
+            pred_bboxes = result[0]['pts_bbox']['boxes_3d'].tensor.numpy()
+            pred_scores = result[0]['pts_bbox']['scores_3d'].numpy()
+        else:
+            pred_bboxes = result[0]['boxes_3d'].tensor.numpy()
+            pred_scores = result[0]['scores_3d'].numpy()
+
+        # filter out low score bboxes for visualization
+        if score_thr > 0:
+            inds = pred_scores > score_thr
+            pred_bboxes = pred_bboxes[inds]
+
+        # for now we convert points into depth mode
+        box_mode = data['img_metas'][0][0]['box_mode_3d']
+        if box_mode != Box3DMode.DEPTH:
+            points = points[..., [1, 0, 2]]
+            points[..., 0] *= -1
+            show_bboxes = Box3DMode.convert(pred_bboxes, box_mode, Box3DMode.DEPTH)
+        else:
+            show_bboxes = deepcopy(pred_bboxes)
+
+        show_result(
+            points,
+            None,
+            show_bboxes,
+            out_dir,
+            file_name,
+            show=show,
+            snapshot=snapshot)
+
+        return file_name
 def inference_mono_3d_detector(model, image, ann_file):
     """Inference image with the monocular 3D detector.
 
@@ -388,6 +488,11 @@ def show_proj_det_result_meshlab(data,
     pred_scores = result[0]['scores_3d'].numpy()
 
     # filter out low score bboxes for visualization
+    #if score_thr > 0:
+    #    pred_score_max = np.amax(pred_scores)
+    #    inds = pred_scores == pred_score_max
+    #    pred_bboxes = pred_bboxes[inds]
+
     if score_thr > 0:
         inds = pred_scores > score_thr
         pred_bboxes = pred_bboxes[inds]
