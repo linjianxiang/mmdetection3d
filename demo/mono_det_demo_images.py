@@ -3,6 +3,10 @@ import glob
 from mmdet3d.apis import (inference_mono_3d_detector,inference_mono_detector, init_model,
                           show_result_meshlab)
 
+import functools
+import time
+import cv2
+
 
 def main():
     parser = ArgumentParser()
@@ -30,14 +34,16 @@ def main():
     #run on images
     print("image dir is ", args.imageDir)
     input_dir = '/home/robolution-tech/data/realsense_road'
-    image_list = glob.glob(args.imageDir+'/*.png')
-
+    image_list = glob.glob(args.imageDir+'/*')
+    print(image_list)
 
     #result, data = inference_mono_3d_detector(model, args.image, args.ann)
     mono_detector = inference_mono_detector(model, args.ann)
     for image in image_list:
+        t0 = time.time()
         result, data = mono_detector.inference_mono_3d_detector(image)
-        #print(result)
+        t1 = time.time()
+        # print(result)
         # show the results
         show_result_meshlab(
             data,
@@ -48,6 +54,6 @@ def main():
             snapshot=args.snapshot,
             task='mono-det')
 
-
+        print(t1-t0)
 if __name__ == '__main__':
     main()

@@ -7,6 +7,8 @@ from mmcv.parallel import collate, scatter
 from mmcv.runner import load_checkpoint
 from os import path as osp
 
+import os
+
 from mmdet3d.core import (Box3DMode, DepthInstance3DBoxes,
                           LiDARInstance3DBoxes, show_multi_modality_result,
                           show_result, show_seg_result)
@@ -475,7 +477,8 @@ def show_proj_det_result_meshlab(data,
     assert 'img' in data.keys(), 'image data is not provided for visualization'
 
     img_filename = data['img_metas'][0][0]['filename']
-    file_name = osp.split(img_filename)[-1].split('.')[0]
+    # file_name = osp.split(img_filename)[-1].split('.')[0]
+    file_name = os.path.basename(img_filename)
 
     # read from file because img in data_dict has undergone pipeline transform
     img = mmcv.imread(img_filename)
